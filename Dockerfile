@@ -26,12 +26,18 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar versión estable de Google Chrome
+# Instalar Google Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar ChromeDriver manualmente (versión 114.0.5735.90 que es compatible con muchas versiones de Chrome)
+RUN wget -q --no-verbose -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip" \
+    && unzip /tmp/chromedriver.zip -d /usr/local/bin \
+    && rm /tmp/chromedriver.zip \
+    && chmod +x /usr/local/bin/chromedriver
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -39,11 +45,12 @@ WORKDIR /app
 # Establecer como entorno Docker
 ENV DOCKER_ENV=true
 ENV PORT=8080
+ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
 
 # Copiar requirements.txt primero para aprovechar la caché
 COPY requirements.txt .
 
-# Instalar dependencias de Python con versiones específicas 
+# Instalar dependencias de Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del código
