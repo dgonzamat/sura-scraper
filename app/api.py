@@ -195,36 +195,63 @@ def start_extraction():
 def load_results_from_file():
     try:
         data_dir = Path("data")
+        print(f"Buscando archivos JSON en {data_dir.absolute()}")
+        
+        # Verificar si el directorio existe
+        if not data_dir.exists():
+            print(f"Directorio {data_dir.absolute()} no existe, creándolo")
+            data_dir.mkdir(parents=True, exist_ok=True)
+        
         json_files = list(data_dir.glob("*.json"))
+        print(f"Archivos encontrados: {json_files}")
         
         if not json_files:
+            print("No se encontraron archivos JSON en el directorio data/")
             results_cache["data"] = []
             return
         
         # Obtener el archivo más reciente
         latest_file = max(json_files, key=lambda x: x.stat().st_mtime)
+        print(f"Usando el archivo más reciente: {latest_file}")
         
         with open(latest_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            content = f.read()
+            print(f"Contenido leído, tamaño: {len(content)} bytes")
+            
+            if not content.strip():
+                print("El archivo está vacío")
+                results_cache["data"] = []
+                return
+                
+            data = json.loads(content)
+            print(f"Datos JSON cargados: {type(data)}")
             
         # Actualizar el cache
         if isinstance(data, list):
             results_cache["data"] = data
+            print(f"Cargados {len(data)} resultados (formato lista)")
         elif isinstance(data, dict):
             # Si es un diccionario, extraer la lista de resultados
             if "search_results" in data:
                 results_cache["data"] = data["search_results"]
+                print(f"Cargados {len(data['search_results'])} resultados (de search_results)")
             elif "pages_content" in data:
                 results_cache["data"] = data["pages_content"]
+                print(f"Cargados {len(data['pages_content'])} resultados (de pages_content)")
             else:
                 results_cache["data"] = [data]
+                print("Cargado un único resultado (diccionario)")
         
         results_cache["last_updated"] = datetime.datetime.fromtimestamp(
             latest_file.stat().st_mtime
         ).isoformat()
         
+        print(f"Cache actualizado con {len(results_cache['data'])} resultados")
+        
     except Exception as e:
-        print(f"Error al cargar resultados desde archivo: {str(e)}")
+        import traceback
+        print(f"Error detallado al cargar resultados: {str(e)}")
+        traceback.print_exc()
         results_cache["data"] = []
 
 # Función para ejecutar en un hilo separado

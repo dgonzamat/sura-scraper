@@ -33,15 +33,19 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar ChromeDriver dinámicamente
-RUN CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3 | cut -d '.' -f 1) \
-    && CHROMEDRIVER_VERSION=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}) \
-    && echo "Installing ChromeDriver version: ${CHROMEDRIVER_VERSION}" \
+# Obtener la versión actual de Chrome
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1-3) \
+    && echo "Chrome version: $CHROME_VERSION"
+
+# Instalar la versión compatible de ChromeDriver automáticamente
+RUN CHROME_MAJOR_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1) \
+    && wget -q --no-verbose -O /tmp/LATEST_RELEASE "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}" \
+    && CHROMEDRIVER_VERSION=$(cat /tmp/LATEST_RELEASE) \
+    && echo "Installing ChromeDriver version: $CHROMEDRIVER_VERSION to match Chrome $CHROME_MAJOR_VERSION" \
     && wget -q --no-verbose -O /tmp/chromedriver_linux64.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" \
     && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin \
     && rm /tmp/chromedriver_linux64.zip \
-    && chmod +x /usr/local/bin/chromedriver \
-    && chromedriver --version
+    && chmod +x /usr/local/bin/chromedriver
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -60,7 +64,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Crear directorios de datos y logs
-RUN mkdir -p data logs
+RUN mkdir -p data logs && chmod -R 777 data logs
 
 # Exponer puerto
 EXPOSE 8080
