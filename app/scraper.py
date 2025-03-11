@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.os_manager import ChromeType
 
 class SuraScraper:
     """Clase para extraer datos del sitio web de Seguros Sura."""
@@ -33,7 +34,7 @@ class SuraScraper:
         options = Options()
         
         if self.headless:
-            options.add_argument("--headless")
+            options.add_argument("--headless=new")  # Utiliza el nuevo modo headless
             
         # Configuraciones adicionales para estabilidad
         options.add_argument("--no-sandbox")
@@ -41,23 +42,35 @@ class SuraScraper:
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1920,1080")
         
+        # Opciones para evitar errores de compatibilidad
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--disable-features=NetworkService")
+        
         # User agent para evitar detección como bot
         options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         
         try:
-            # En entorno de producción (Docker), usar webdriver_manager para asegurar compatibilidad
-            from webdriver_manager.chrome import ChromeDriverManager
-            from webdriver_manager.core.os_manager import ChromeType
+            print("Inicializando ChromeDriver mediante webdriver_manager...")
+            # Usar webdriver_manager para gestionar la versión compatible de chromedriver
+            # Con configuración para asegurar compatibilidad
+            driver_path = ChromeDriverManager().install()
+            print(f"ChromeDriver instalado en: {driver_path}")
             
-            service = Service(ChromeDriverManager().install())
+            service = Service(executable_path=driver_path)
             self.driver = webdriver.Chrome(service=service, options=options)
             
             self.driver.set_page_load_timeout(self.timeout)
+            print("Navegador Chrome inicializado correctamente")
             
             return True
         except Exception as e:
-            print(f"Error al inicializar el navegador: {str(e)}")
+            print(f"Error detallado al inicializar el navegador: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
+
+    # El resto del código permanece igual...
     
     def close(self):
         """Cierra el navegador y libera recursos."""
@@ -82,6 +95,7 @@ class SuraScraper:
         
         try:
             # Navegar a la página principal
+            print(f"Navegando a {self.base_url}...")
             self.driver.get(self.base_url)
             
             # Esperar a que cargue
@@ -90,6 +104,7 @@ class SuraScraper:
             # Buscar el campo de búsqueda
             # Nota: Esto depende de la estructura real del sitio web
             try:
+                print("Buscando elementos de búsqueda...")
                 search_button = WebDriverWait(self.driver, 10).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, ".sfsearchSubmit, button[type='submit']"))
                 )
@@ -98,6 +113,7 @@ class SuraScraper:
                 # Ingresar término de búsqueda
                 search_input.clear()
                 search_input.send_keys(term)
+                print(f"Buscando el término: '{term}'")
                 search_button.click()
                 
                 # Esperar a que carguen los resultados
@@ -106,6 +122,7 @@ class SuraScraper:
                 # Extraer resultados
                 results = []
                 result_elements = self.driver.find_elements(By.CSS_SELECTOR, ".searchResults .searchItem, .search-results .result-item")
+                print(f"Encontrados {len(result_elements)} resultados")
                 
                 for element in result_elements[:max_results]:
                     try:
@@ -130,6 +147,7 @@ class SuraScraper:
                         print(f"Error al extraer resultado: {str(e)}")
                 
                 self.results = results
+                print(f"Extracción completada: {len(results)} resultados procesados")
                 return results
                 
             except Exception as e:
@@ -137,6 +155,7 @@ class SuraScraper:
                 
                 # Plan B: Intentar acceder directamente a la URL de búsqueda
                 search_url = f"{self.base_url}/search?q={term}"
+                print(f"Intentando acceder directamente a URL de búsqueda: {search_url}")
                 self.driver.get(search_url)
                 time.sleep(3)
                 
@@ -165,6 +184,7 @@ class SuraScraper:
         
         try:
             # Navegar a la URL
+            print(f"Extrayendo contenido de: {url}")
             self.driver.get(url)
             
             # Esperar a que cargue
@@ -265,6 +285,7 @@ class SuraScraper:
         
         try:
             # Buscar información sobre seguros colectivos
+            print("Iniciando extracción de información sobre seguros colectivos")
             search_results = self.search_by_term("seguros colectivos", max_results=max_pages)
             results["search_results"] = search_results
             
@@ -276,6 +297,7 @@ class SuraScraper:
             # Intentar acceder directamente a la página de seguros colectivos
             direct_url = f"{self.base_url}/empresas/seguros-colectivos"
             try:
+                print(f"Accediendo directamente a: {direct_url}")
                 direct_page_content = self.extract_page_content(direct_url)
                 results["direct_page"] = direct_page_content
             except Exception as e:

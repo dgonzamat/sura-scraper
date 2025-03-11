@@ -26,20 +26,12 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Google Chrome
+# Instalar versión estable de Google Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
     && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
-
-# Instalar una versión específica de ChromeDriver que funcione con Chrome 134.x
-# Usamos versión 134.0.6052.0 que es compatible con Chrome 134
-RUN wget -q --no-verbose -O /tmp/chromedriver_linux64.zip "https://storage.googleapis.com/chrome-for-testing-public/134.0.6052.0/linux64/chromedriver-linux64.zip" \
-    && unzip /tmp/chromedriver_linux64.zip -d /tmp \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver_linux64.zip /tmp/chromedriver-linux64
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -51,7 +43,7 @@ ENV PORT=8080
 # Copiar requirements.txt primero para aprovechar la caché
 COPY requirements.txt .
 
-# Instalar dependencias de Python
+# Instalar dependencias de Python con versiones específicas 
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el resto del código
