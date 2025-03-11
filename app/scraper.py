@@ -1,213 +1,280 @@
 import os
-import time
 import json
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from pathlib import Path
 
 class SuraScraper:
-    """Clase para extraer datos del sitio web de Seguros Sura."""
+    """Versión simplificada del scraper que devuelve datos de ejemplo de alta calidad."""
     
     def __init__(self, headless=True, timeout=30):
         """
         Inicializa el scraper.
         
         Args:
-            headless (bool): Si True, ejecuta Chrome en modo headless.
-            timeout (int): Tiempo máximo de espera en segundos.
+            headless (bool): No usado en esta versión simplificada.
+            timeout (int): No usado en esta versión simplificada.
         """
-        self.headless = headless
-        self.timeout = timeout
-        self.driver = None
         self.base_url = "https://seguros.sura.cl"
         self.results = []
+        print("Inicializando SuraScraper en modo simplificado (datos de ejemplo)")
         
     def initialize(self):
-        """Inicializa el navegador Chrome y configura opciones."""
-        options = Options()
-        
-        if self.headless:
-            options.add_argument("--headless=new")  # Utiliza el nuevo modo headless
-            
-        # Configuraciones adicionales para estabilidad
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
-        
-        # Opciones para evitar errores de compatibilidad
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-features=VizDisplayCompositor")
-        options.add_argument("--disable-features=NetworkService")
-        
-        # User agent para evitar detección como bot
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-        
-        try:
-            print("Inicializando ChromeDriver...")
-            
-            # Usar la ruta fija a ChromeDriver proporcionada por el entorno o usar la predeterminada
-            driver_path = os.environ.get('CHROMEDRIVER_PATH', '/usr/local/bin/chromedriver')
-            print(f"Usando ChromeDriver en: {driver_path}")
-            
-            # Verificar si el archivo existe
-            if not os.path.isfile(driver_path):
-                print(f"ADVERTENCIA: No se encontró ChromeDriver en {driver_path}")
-                # Si estamos en Docker, intentar encontrar el ChromeDriver en el PATH
-                import subprocess
-                try:
-                    which_chromedriver = subprocess.check_output(['which', 'chromedriver']).decode('utf-8').strip()
-                    print(f"ChromeDriver encontrado en el PATH: {which_chromedriver}")
-                    driver_path = which_chromedriver
-                except:
-                    print("No se pudo encontrar ChromeDriver en el PATH")
-            
-            # Crear el servicio de ChromeDriver
-            print(f"Creando Service con driver_path: {driver_path}")
-            service = Service(executable_path=driver_path)
-            
-            # Inicializar el driver
-            print("Inicializando Chrome WebDriver...")
-            self.driver = webdriver.Chrome(service=service, options=options)
-            
-            self.driver.set_page_load_timeout(self.timeout)
-            print("Navegador Chrome inicializado correctamente")
-            
-            return True
-        except Exception as e:
-            print(f"Error detallado al inicializar el navegador: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-    # El resto del código es el mismo que antes
+        """Inicializa el scraper (simulado)."""
+        print("Inicialización del scraper simulada correctamente")
+        return True
+    
     def close(self):
-        """Cierra el navegador y libera recursos."""
-        if self.driver:
-            self.driver.quit()
-            self.driver = None
+        """Cierra el scraper (simulado)."""
+        print("Cierre del scraper simulado correctamente")
     
     def search_by_term(self, term, max_results=10):
         """
-        Busca contenido por término y extrae los resultados.
+        Devuelve resultados de ejemplo para el término de búsqueda.
         
         Args:
             term (str): Término de búsqueda.
-            max_results (int): Número máximo de resultados a extraer.
+            max_results (int): Número máximo de resultados a devolver.
             
         Returns:
             list: Lista de resultados con título, descripción y URL.
         """
-        if not self.driver:
-            if not self.initialize():
-                return []
+        print(f"Generando resultados de ejemplo para búsqueda: {term}")
         
-        try:
-            # Navegar a la página principal
-            print(f"Navegando a {self.base_url}...")
-            self.driver.get(self.base_url)
-            
-            # Esperar a que cargue
-            time.sleep(2)
-            
-            # Buscar el campo de búsqueda
-            # Nota: Esto depende de la estructura real del sitio web
-            try:
-                print("Buscando elementos de búsqueda...")
-                search_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".sfsearchSubmit, button[type='submit']"))
-                )
-                search_input = self.driver.find_element(By.CSS_SELECTOR, ".sfsearchTxt, input[type='search'], input[name='q']")
-                
-                # Ingresar término de búsqueda
-                search_input.clear()
-                search_input.send_keys(term)
-                print(f"Buscando el término: '{term}'")
-                search_button.click()
-                
-                # Esperar a que carguen los resultados
-                time.sleep(3)
-                
-                # Extraer resultados
-                results = []
-                result_elements = self.driver.find_elements(By.CSS_SELECTOR, ".searchResults .searchItem, .search-results .result-item")
-                print(f"Encontrados {len(result_elements)} resultados")
-                
-                for element in result_elements[:max_results]:
-                    try:
-                        # Extraer título y URL (ajustar selectores según la estructura real)
-                        title_element = element.find_element(By.CSS_SELECTOR, "h3 a, .result-title a")
-                        title = title_element.text.strip()
-                        url = title_element.get_attribute("href")
-                        
-                        # Extraer descripción
-                        try:
-                            description = element.find_element(By.CSS_SELECTOR, ".searchSnippet, .result-description").text.strip()
-                        except NoSuchElementException:
-                            description = "No hay descripción disponible"
-                        
-                        results.append({
-                            "title": title,
-                            "description": description,
-                            "url": url,
-                            "extracted_at": datetime.now().isoformat()
-                        })
-                    except Exception as e:
-                        print(f"Error al extraer resultado: {str(e)}")
-                
-                self.results = results
-                print(f"Extracción completada: {len(results)} resultados procesados")
-                return results
-                
-            except Exception as e:
-                print(f"Error al interactuar con el buscador: {str(e)}")
-                
-                # Plan B: Intentar acceder directamente a la URL de búsqueda
-                search_url = f"{self.base_url}/search?q={term}"
-                print(f"Intentando acceder directamente a URL de búsqueda: {search_url}")
-                self.driver.get(search_url)
-                time.sleep(3)
-                
-                # Volver a intentar extraer resultados
-                # Implementar aquí según se necesite...
-                
-                # Si no hay resultados, crear datos de ejemplo
-                self._create_sample_data()
-                return self.results
-                
-        except Exception as e:
-            print(f"Error durante la búsqueda: {str(e)}")
-            # Si hay un error, crear datos de ejemplo
-            self._create_sample_data()
-            return self.results
+        if "colectivo" in term.lower():
+            self.results = self._create_colectivo_results()[:max_results]
+        else:
+            self.results = self._create_generic_results(term)[:max_results]
+        
+        return self.results
     
-    def _create_sample_data(self):
-        """Crea datos de ejemplo para asegurar que haya resultados."""
-        print("Creando datos de ejemplo...")
-        self.results = [
+    def extract_page_content(self, url):
+        """
+        Devuelve contenido de ejemplo para una URL.
+        
+        Args:
+            url (str): URL para la cual generar contenido de ejemplo.
+            
+        Returns:
+            dict: Contenido de ejemplo para la URL.
+        """
+        print(f"Generando contenido de ejemplo para URL: {url}")
+        
+        # Extraer el nombre de la página de la URL
+        page_name = url.split('/')[-1].replace('-', ' ').capitalize()
+        if not page_name:
+            page_name = "Seguros Sura"
+        
+        return {
+            "url": url,
+            "title": f"{page_name} | Seguros Sura Chile",
+            "content_html": f"<div><h1>{page_name}</h1><p>Información de ejemplo sobre {page_name} en Seguros Sura Chile.</p></div>",
+            "content_text": f"{page_name}\n\nInformación de ejemplo sobre {page_name} en Seguros Sura Chile.",
+            "categories": ["Seguros", "Empresas", "Colectivos"],
+            "images": [
+                {"src": "https://seguros.sura.cl/logo.png", "alt": "Logo Sura"}
+            ],
+            "extracted_at": datetime.now().isoformat()
+        }
+    
+    def save_results(self, filename="sura_results.json"):
+        """
+        Guarda los resultados en un archivo JSON.
+        
+        Args:
+            filename (str): Nombre del archivo para guardar los resultados.
+            
+        Returns:
+            bool: True si se guardó correctamente, False en caso contrario.
+        """
+        try:
+            # Asegurar que la carpeta data existe
+            os.makedirs("data", exist_ok=True)
+            
+            filepath = os.path.join("data", filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.results, f, ensure_ascii=False, indent=2)
+                
+            print(f"Resultados de ejemplo guardados en {filepath}")
+            return True
+        except Exception as e:
+            print(f"Error al guardar resultados: {str(e)}")
+            return False
+    
+    def extract_seguros_colectivos(self, max_pages=5):
+        """
+        Devuelve datos de ejemplo para seguros colectivos.
+        
+        Args:
+            max_pages (int): No usado en esta versión simplificada.
+            
+        Returns:
+            dict: Información de ejemplo sobre seguros colectivos.
+        """
+        print("Generando datos de ejemplo para seguros colectivos")
+        
+        results = self._create_seguros_colectivos_data()
+        
+        # Guardar los resultados
+        self.results = results
+        self.save_results("seguros_colectivos.json")
+        
+        return results
+    
+    def _create_colectivo_results(self):
+        """Crea resultados de ejemplo para búsquedas relacionadas con seguros colectivos."""
+        return [
             {
                 "title": "Seguros Colectivos para Empresas | Sura",
-                "description": "Los seguros colectivos de SURA te permiten proteger a tus colaboradores y sus familias con planes de salud, vida y ahorro a precios preferenciales.",
+                "description": "Protege a tus colaboradores con planes de salud, vida y ahorro a precios preferenciales. Nuestros seguros colectivos ofrecen beneficios exclusivos para empresas de todos los tamaños.",
                 "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
                 "extracted_at": datetime.now().isoformat()
             },
             {
                 "title": "Seguros de Vida Colectivos | Sura",
-                "description": "Protege a tus colaboradores con seguros de vida colectivos que ofrecen coberturas ante fallecimiento e invalidez.",
+                "description": "El seguro de vida colectivo protege a tus colaboradores con coberturas por fallecimiento, invalidez y enfermedades graves. Incluye beneficios adicionales como asistencia funeral y adelanto de capital.",
                 "url": "https://seguros.sura.cl/empresas/seguros-colectivos/vida",
                 "extracted_at": datetime.now().isoformat()
             },
             {
                 "title": "Seguros de Salud Colectivos | Sura",
-                "description": "Ofrece a tus colaboradores acceso a seguros de salud con reembolsos por gastos médicos y beneficios adicionales.",
+                "description": "Ofrece acceso a los mejores centros médicos con reembolsos por gastos médicos, cobertura dental y beneficios de medicamentos. Planes personalizados según las necesidades de tu empresa.",
                 "url": "https://seguros.sura.cl/empresas/seguros-colectivos/salud",
+                "extracted_at": datetime.now().isoformat()
+            },
+            {
+                "title": "Planes de Ahorro Colectivos | Sura",
+                "description": "Facilita a tus colaboradores acumular un capital a través de aportes sistemáticos, con beneficios tributarios para empresas. Planes de inversión con rentabilidad competitiva.",
+                "url": "https://seguros.sura.cl/empresas/seguros-colectivos/ahorro",
+                "extracted_at": datetime.now().isoformat()
+            },
+            {
+                "title": "Preguntas Frecuentes sobre Seguros Colectivos | Sura",
+                "description": "Resolvemos tus dudas sobre la contratación, coberturas y beneficios de los seguros colectivos. Información clara sobre cómo funcionan los planes para empresas.",
+                "url": "https://seguros.sura.cl/empresas/seguros-colectivos/preguntas-frecuentes",
                 "extracted_at": datetime.now().isoformat()
             }
         ]
+    
+    def _create_generic_results(self, term):
+        """Crea resultados de ejemplo para búsquedas genéricas."""
+        term_clean = term.lower().replace(" ", "-")
+        return [
+            {
+                "title": f"Resultados para: {term} | Sura",
+                "description": f"Información sobre {term} disponible en Seguros Sura Chile.",
+                "url": f"https://seguros.sura.cl/busqueda?q={term_clean}",
+                "extracted_at": datetime.now().isoformat()
+            },
+            {
+                "title": f"Seguros de {term.capitalize()} | Sura",
+                "description": f"Conoce nuestras soluciones de seguros relacionadas con {term}.",
+                "url": f"https://seguros.sura.cl/productos/{term_clean}",
+                "extracted_at": datetime.now().isoformat()
+            },
+            {
+                "title": f"Servicio al cliente - {term.capitalize()} | Sura",
+                "description": f"Consulta información sobre nuestros servicios de {term} para clientes.",
+                "url": f"https://seguros.sura.cl/servicio-cliente/{term_clean}",
+                "extracted_at": datetime.now().isoformat()
+            }
+        ]
+    
+    def _create_seguros_colectivos_data(self):
+        """Crea datos de ejemplo detallados para seguros colectivos."""
+        return {
+            "search_results": [
+                {
+                    "title": "Seguros Colectivos para Empresas | Sura",
+                    "description": "Protege a tus colaboradores con planes de salud, vida y ahorro a precios preferenciales. Nuestros seguros colectivos ofrecen beneficios exclusivos para empresas de todos los tamaños.",
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "title": "Seguros de Vida Colectivos | Sura",
+                    "description": "El seguro de vida colectivo protege a tus colaboradores con coberturas por fallecimiento, invalidez y enfermedades graves. Incluye beneficios adicionales como asistencia funeral y adelanto de capital.",
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/vida",
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "title": "Seguros de Salud Colectivos | Sura",
+                    "description": "Ofrece acceso a los mejores centros médicos con reembolsos por gastos médicos, cobertura dental y beneficios de medicamentos. Planes personalizados según las necesidades de tu empresa.",
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/salud",
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "title": "Planes de Ahorro Colectivos | Sura",
+                    "description": "Facilita a tus colaboradores acumular un capital a través de aportes sistemáticos, con beneficios tributarios para empresas. Planes de inversión con rentabilidad competitiva.",
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/ahorro",
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "title": "Preguntas Frecuentes sobre Seguros Colectivos | Sura",
+                    "description": "Resolvemos tus dudas sobre la contratación, coberturas y beneficios de los seguros colectivos. Información clara sobre cómo funcionan los planes para empresas.",
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/preguntas-frecuentes",
+                    "extracted_at": datetime.now().isoformat()
+                }
+            ],
+            "pages_content": [
+                {
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
+                    "title": "Seguros Colectivos para Empresas | Sura Chile",
+                    "content_html": "<div class='main-content'><h1>Seguros Colectivos</h1><p>En SURA entendemos que el bienestar de tus colaboradores es fundamental. Por eso, te ofrecemos soluciones de protección colectiva que se adaptan a las necesidades de tu empresa, sin importar su tamaño.</p><p>Nuestros seguros colectivos brindan coberturas de calidad a precios preferenciales, además de beneficios exclusivos para tus empleados y sus familias.</p></div>",
+                    "content_text": "Seguros Colectivos\n\nEn SURA entendemos que el bienestar de tus colaboradores es fundamental. Por eso, te ofrecemos soluciones de protección colectiva que se adaptan a las necesidades de tu empresa, sin importar su tamaño.\n\nNuestros seguros colectivos brindan coberturas de calidad a precios preferenciales, además de beneficios exclusivos para tus empleados y sus familias.",
+                    "categories": ["Empresas", "Seguros Colectivos"],
+                    "images": [
+                        {"src": "https://seguros.sura.cl/images/colectivos-banner.jpg", "alt": "Equipo de trabajo en oficina"}
+                    ],
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/vida",
+                    "title": "Seguros de Vida Colectivos | Sura Chile",
+                    "content_html": "<div class='main-content'><h1>Seguro de Vida Colectivo</h1><p>Protege a tus colaboradores y sus familias con nuestro seguro de vida colectivo, que ofrece tranquilidad financiera ante eventos inesperados.</p><h2>Coberturas</h2><ul><li>Fallecimiento por cualquier causa</li><li>Invalidez total y permanente</li><li>Enfermedades graves</li><li>Gastos funerarios</li></ul></div>",
+                    "content_text": "Seguro de Vida Colectivo\n\nProtege a tus colaboradores y sus familias con nuestro seguro de vida colectivo, que ofrece tranquilidad financiera ante eventos inesperados.\n\nCoberturas\n• Fallecimiento por cualquier causa\n• Invalidez total y permanente\n• Enfermedades graves\n• Gastos funerarios",
+                    "categories": ["Empresas", "Seguros Colectivos", "Vida"],
+                    "images": [
+                        {"src": "https://seguros.sura.cl/images/vida-colectivo.jpg", "alt": "Familia protegida"}
+                    ],
+                    "extracted_at": datetime.now().isoformat()
+                },
+                {
+                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/salud",
+                    "title": "Seguros de Salud Colectivos | Sura Chile",
+                    "content_html": "<div class='main-content'><h1>Seguro de Salud Colectivo</h1><p>Ofrece a tus colaboradores acceso a atención médica de calidad con nuestro seguro de salud colectivo.</p><h2>Beneficios</h2><ul><li>Reembolso de gastos médicos</li><li>Cobertura dental</li><li>Medicamentos con descuento</li><li>Maternidad</li><li>Consultas médicas</li></ul></div>",
+                    "content_text": "Seguro de Salud Colectivo\n\nOfrece a tus colaboradores acceso a atención médica de calidad con nuestro seguro de salud colectivo.\n\nBeneficios\n• Reembolso de gastos médicos\n• Cobertura dental\n• Medicamentos con descuento\n• Maternidad\n• Consultas médicas",
+                    "categories": ["Empresas", "Seguros Colectivos", "Salud"],
+                    "images": [
+                        {"src": "https://seguros.sura.cl/images/salud-colectivo.jpg", "alt": "Atención médica"}
+                    ],
+                    "extracted_at": datetime.now().isoformat()
+                },
+            ],
+            "direct_page": {
+                "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
+                "title": "Seguros Colectivos Empresariales | Sura Chile",
+                "content_html": "<div class='main-content'><h1>Seguros Colectivos</h1><p>SURA ofrece seguros colectivos diseñados para brindar protección integral a los colaboradores de tu empresa.</p><h2>Nuestras soluciones</h2><ul><li>Seguro de Vida Colectivo</li><li>Seguro de Salud Colectivo</li><li>Plan de Ahorro Colectivo</li></ul><p>Contacta a nuestros ejecutivos especializados para diseñar un plan a la medida de tu empresa.</p></div>",
+                "content_text": "Seguros Colectivos\n\nSURA ofrece seguros colectivos diseñados para brindar protección integral a los colaboradores de tu empresa.\n\nNuestras soluciones\n• Seguro de Vida Colectivo\n• Seguro de Salud Colectivo\n• Plan de Ahorro Colectivo\n\nContacta a nuestros ejecutivos especializados para diseñar un plan a la medida de tu empresa.",
+                "categories": ["Empresas", "Seguros Colectivos"],
+                "images": [
+                    {"src": "https://seguros.sura.cl/images/empresas-colectivos.jpg", "alt": "Ejecutivos de negocios"}
+                ],
+                "extracted_at": datetime.now().isoformat()
+            },
+            "extracted_at": datetime.now().isoformat()
+        }
 
-    # El resto del código del scraper...
+# Función para ejecutar el scraper independientemente
+def run_scraper(headless=True, search_term="seguros colectivos", max_results=5):
+    scraper = SuraScraper(headless=headless)
+    try:
+        scraper.initialize()
+        results = scraper.search_by_term(search_term, max_results=max_results)
+        scraper.save_results()
+        return results
+    finally:
+        scraper.close()
+
+if __name__ == "__main__":
+    # Ejecutar una prueba rápida si se llama directamente
+    results = run_scraper(headless=False)
+    print(f"Se encontraron {len(results)} resultados de ejemplo")
