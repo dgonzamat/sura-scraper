@@ -2,8 +2,8 @@ services:
   - type: web
     name: sura-scraper-api
     env: docker
-    buildCommand: ""
-    startCommand: ""
+    buildCommand: docker build -t sura-scraper .
+    startCommand: docker run -p 8080:8080 sura-scraper
     healthCheckPath: /health
     envVars:
       - key: API_SECRET_KEY
@@ -11,7 +11,7 @@ services:
       - key: API_USERNAME
         value: admin
       - key: API_PASSWORD
-        value: password123
+        generateValue: true  # Cambiar para mayor seguridad
       - key: HEADLESS
         value: "true"
       - key: TIMEOUT
@@ -20,3 +20,5 @@ services:
         value: "10"
       - key: LOG_LEVEL
         value: INFO
+      - key: DEBUG
+        value: "false"
