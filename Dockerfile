@@ -33,19 +33,13 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Obtener la versión actual de Chrome
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1-3) \
-    && echo "Chrome version: $CHROME_VERSION"
-
-# Instalar la versión compatible de ChromeDriver automáticamente
-RUN CHROME_MAJOR_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1) \
-    && wget -q --no-verbose -O /tmp/LATEST_RELEASE "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR_VERSION}" \
-    && CHROMEDRIVER_VERSION=$(cat /tmp/LATEST_RELEASE) \
-    && echo "Installing ChromeDriver version: $CHROMEDRIVER_VERSION to match Chrome $CHROME_MAJOR_VERSION" \
-    && wget -q --no-verbose -O /tmp/chromedriver_linux64.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" \
-    && unzip /tmp/chromedriver_linux64.zip -d /usr/local/bin \
-    && rm /tmp/chromedriver_linux64.zip \
-    && chmod +x /usr/local/bin/chromedriver
+# Instalar una versión específica de ChromeDriver que funcione con Chrome 134.x
+# Usamos versión 134.0.6052.0 que es compatible con Chrome 134
+RUN wget -q --no-verbose -O /tmp/chromedriver_linux64.zip "https://storage.googleapis.com/chrome-for-testing-public/134.0.6052.0/linux64/chromedriver-linux64.zip" \
+    && unzip /tmp/chromedriver_linux64.zip -d /tmp \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
+    && chmod +x /usr/local/bin/chromedriver \
+    && rm -rf /tmp/chromedriver_linux64.zip /tmp/chromedriver-linux64
 
 # Crear directorio de trabajo
 WORKDIR /app
