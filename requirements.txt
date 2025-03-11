@@ -1,6 +1,6 @@
 # Web scraping
-selenium==4.17.2
-webdriver-manager==4.0.1
+playwright==1.40.0
+requests==2.31.0
 beautifulsoup4==4.12.2
 
 # API y servidor web
@@ -12,4 +12,3 @@ pyjwt==2.8.0
 
 # Utilidades
 python-dotenv==1.0.0
-requests==2.31.0
