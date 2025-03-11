@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: sura-scraper-api
+    env: docker
+    buildCommand: ""
+    startCommand: ""
+    healthCheckPath: /health
+    envVars:
+      - key: API_SECRET_KEY
+        generateValue: true
+      - key: API_USERNAME
+        value: admin
+      - key: API_PASSWORD
+        value: password123
+      - key: HEADLESS
+        value: "true"
+      - key: TIMEOUT
+        value: "30"
+      - key: MAX_RESULTS
+        value: "10"
+      - key: LOG_LEVEL
+        value: INFO

@@ -1,0 +1,210 @@
+{
+    "info": {
+      "_postman_id": "25db7c7d-8def-41d8-a5c2-3fcb8bfe4c27",
+      "name": "Sura Scraper API",
+      "description": "API para extraer datos de seguros.sura.cl desplegada en Render",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+      {
+        "key": "base_url",
+        "value": "https://sura-scraper-api.onrender.com",
+        "type": "string"
+      },
+      {
+        "key": "token",
+        "value": "",
+        "type": "string"
+      }
+    ],
+    "item": [
+      {
+        "name": "Health Check",
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{base_url}}/health",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "health"
+            ]
+          },
+          "description": "Verifica que el servicio está funcionando correctamente."
+        },
+        "response": []
+      },
+      {
+        "name": "API Info",
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{base_url}}/api/info",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "api",
+              "info"
+            ]
+          },
+          "description": "Obtiene información sobre la API y sus endpoints."
+        },
+        "response": []
+      },
+      {
+        "name": "Obtener Token",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "// Extraer el token de la respuesta y guardarlo como variable",
+                "var jsonData = pm.response.json();",
+                "if (jsonData.access_token) {",
+                "    pm.collectionVariables.set(\"token\", jsonData.access_token);",
+                "    console.log(\"Token guardado correctamente\");",
+                "}",
+                "",
+                "// Verificar que la respuesta sea exitosa",
+                "pm.test(\"Respuesta exitosa\", function() {",
+                "    pm.response.to.have.status(200);",
+                "});",
+                "",
+                "// Verificar que la respuesta contenga un token",
+                "pm.test(\"Respuesta contiene token\", function() {",
+                "    pm.expect(jsonData).to.have.property('access_token');",
+                "});"
+              ],
+              "type": "text/javascript"
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password123\"\n}"
+          },
+          "url": {
+            "raw": "{{base_url}}/api/auth/token",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "api",
+              "auth",
+              "token"
+            ]
+          },
+          "description": "Obtiene un token JWT para autenticarse en la API."
+        },
+        "response": []
+      },
+      {
+        "name": "Obtener Resultados",
+        "request": {
+          "method": "GET",
+          "header": [
+            {
+              "key": "Authorization",
+              "value": "Bearer {{token}}"
+            }
+          ],
+          "url": {
+            "raw": "{{base_url}}/api/results?page=1&limit=10",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "api",
+              "results"
+            ],
+            "query": [
+              {
+                "key": "page",
+                "value": "1"
+              },
+              {
+                "key": "limit",
+                "value": "10"
+              }
+            ]
+          },
+          "description": "Obtiene los resultados de las extracciones realizadas."
+        },
+        "response": []
+      },
+      {
+        "name": "Buscar Resultados",
+        "request": {
+          "method": "GET",
+          "header": [
+            {
+              "key": "Authorization",
+              "value": "Bearer {{token}}"
+            }
+          ],
+          "url": {
+            "raw": "{{base_url}}/api/results?q=seguro",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "api",
+              "results"
+            ],
+            "query": [
+              {
+                "key": "q",
+                "value": "seguro"
+              }
+            ]
+          },
+          "description": "Busca resultados con un término específico."
+        },
+        "response": []
+      },
+      {
+        "name": "Iniciar Extracción",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Authorization",
+              "value": "Bearer {{token}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n    \"term\": \"seguros colectivos\",\n    \"max_results\": 5,\n    \"headless\": true\n}"
+          },
+          "url": {
+            "raw": "{{base_url}}/api/extract",
+            "host": [
+              "{{base_url}}"
+            ],
+            "path": [
+              "api",
+              "extract"
+            ]
+          },
+          "description": "Inicia un proceso de extracción de datos."
+        },
+        "response": []
+      }
+    ]
+  }
