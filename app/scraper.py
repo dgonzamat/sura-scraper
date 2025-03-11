@@ -1,19 +1,7 @@
 import os
 import json
-import time
 from datetime import datetime
 from pathlib import Path
-import asyncio
-import nest_asyncio
-
-# Aplicar nest_asyncio para permitir ejecutar loops anidados
-try:
-    nest_asyncio.apply()
-except:
-    print("No se pudo aplicar nest_asyncio, continuando sin él")
-
-# Variable global para mantener un event loop por thread
-thread_local_event_loops = {}
 
 class SuraScraper:
     """
