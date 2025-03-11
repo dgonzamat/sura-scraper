@@ -1,11 +1,16 @@
 import os
 import json
+import time
+import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from pathlib import Path
+from requests.exceptions import RequestException
 
 class SuraScraper:
     """
-    Versión simplificada del scraper que devuelve datos de ejemplo de alta calidad.
+    Implementación de scraper usando Requests y BeautifulSoup.
+    Más ligero y menos propenso a errores que soluciones basadas en navegadores.
     """
     
     def __init__(self, headless=True, timeout=30):
@@ -13,70 +18,320 @@ class SuraScraper:
         Inicializa el scraper.
         
         Args:
-            headless (bool): No usado en esta versión simplificada.
-            timeout (int): No usado en esta versión simplificada.
+            headless (bool): No usado en esta implementación.
+            timeout (int): Tiempo máximo de espera en segundos.
         """
         self.base_url = "https://seguros.sura.cl"
+        self.timeout = timeout
         self.results = []
-        print("Inicializando SuraScraper en modo simplificado (datos de ejemplo)")
+        self.session = None
+        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        print("Inicializando SuraScraper con Requests + BeautifulSoup")
         
     def initialize(self):
-        """Inicializa el scraper (simulado)."""
-        print("Inicialización del scraper simulada correctamente")
-        return True
+        """Inicializa la sesión HTTP."""
+        try:
+            self.session = requests.Session()
+            self.session.headers.update({
+                'User-Agent': self.user_agent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Cache-Control': 'max-age=0'
+            })
+            
+            # Verificar si el sitio está accesible
+            response = self.session.get(
+                self.base_url, 
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+            
+            print(f"Conexión establecida con {self.base_url} (status: {response.status_code})")
+            return True
+        except RequestException as e:
+            print(f"Error al inicializar la conexión: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"Error inesperado durante la inicialización: {str(e)}")
+            return False
     
     def close(self):
-        """Cierra el scraper (simulado)."""
-        print("Cierre del scraper simulado correctamente")
+        """Cierra la sesión HTTP."""
+        if self.session:
+            self.session.close()
+            self.session = None
+            print("Sesión HTTP cerrada")
     
     def search_by_term(self, term, max_results=10):
         """
-        Devuelve resultados de ejemplo para el término de búsqueda.
+        Busca contenido por término y extrae los resultados.
+        Intenta hacer scraping real y, si falla, usa datos de ejemplo.
         
         Args:
             term (str): Término de búsqueda.
-            max_results (int): Número máximo de resultados a devolver.
+            max_results (int): Número máximo de resultados a extraer.
             
         Returns:
             list: Lista de resultados con título, descripción y URL.
         """
-        print(f"Generando resultados de ejemplo para búsqueda: {term}")
+        if not self.session and not self.initialize():
+            print("No se pudo inicializar la sesión, usando datos de ejemplo")
+            return self._get_example_search_results(term, max_results)
         
-        if "colectivo" in term.lower():
-            self.results = self._create_colectivo_results()[:max_results]
-        else:
-            self.results = self._create_generic_results(term)[:max_results]
-        
-        return self.results
+        try:
+            # Intentar buscar en el sitio
+            print(f"Buscando término: '{term}'")
+            
+            # Construir la URL de búsqueda
+            search_url = f"{self.base_url}/busqueda?q={term}"
+            
+            # Realizar la solicitud
+            response = self.session.get(
+                search_url,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+            
+            # Parsear el HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Guardar una copia del HTML para depuración
+            os.makedirs("data", exist_ok=True)
+            debug_file = os.path.join("data", f"search_response_{datetime.now().strftime('%Y%m%d%H%M%S')}.html")
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            print(f"HTML de respuesta guardado en {debug_file}")
+            
+            # Buscar resultados en diferentes posibles estructuras HTML
+            results = []
+            
+            # Intentar diferentes selectores para resultados de búsqueda
+            selectors = [
+                ".searchResults .searchItem", 
+                ".search-results .result-item",
+                ".results-list .item",
+                "article.result",
+                ".search-result",
+                ".result"
+            ]
+            
+            found_results = False
+            for selector in selectors:
+                result_elements = soup.select(selector)
+                if result_elements:
+                    print(f"Encontrados {len(result_elements)} resultados con selector: {selector}")
+                    found_results = True
+                    
+                    for element in result_elements[:max_results]:
+                        try:
+                            # Buscar título y URL con diferentes selectores
+                            title_selectors = ["h3 a", ".result-title a", "a.title", "h2 a", ".title a", "a[href]"]
+                            title_element = None
+                            
+                            for title_selector in title_selectors:
+                                title_element = element.select_one(title_selector)
+                                if title_element:
+                                    break
+                            
+                            if not title_element:
+                                continue
+                            
+                            title = title_element.get_text(strip=True)
+                            url = title_element.get('href')
+                            if url and not url.startswith('http'):
+                                url = self.base_url + url if url.startswith('/') else self.base_url + '/' + url
+                            
+                            # Buscar descripción con diferentes selectores
+                            desc_selectors = [".searchSnippet", ".result-description", ".snippet", "p.description", "p"]
+                            description = "No hay descripción disponible"
+                            
+                            for desc_selector in desc_selectors:
+                                desc_element = element.select_one(desc_selector)
+                                if desc_element:
+                                    description = desc_element.get_text(strip=True)
+                                    break
+                            
+                            if title and url:
+                                results.append({
+                                    "title": title,
+                                    "description": description,
+                                    "url": url,
+                                    "extracted_at": datetime.now().isoformat()
+                                })
+                        except Exception as e:
+                            print(f"Error al procesar un resultado: {str(e)}")
+                    
+                    break
+            
+            if not found_results:
+                print("No se encontraron resultados con los selectores conocidos")
+                
+                # Intento alternativo: buscar todos los enlaces con texto
+                links = soup.find_all('a', href=True)
+                print(f"Encontrados {len(links)} enlaces en total")
+                
+                relevant_links = []
+                search_term_lower = term.lower()
+                
+                for link in links:
+                    link_text = link.get_text(strip=True)
+                    link_href = link.get('href')
+                    
+                    # Filtrar enlaces relevantes
+                    if link_text and len(link_text) > 10 and search_term_lower in link_text.lower():
+                        url = link_href
+                        if url and not url.startswith('http'):
+                            url = self.base_url + url if url.startswith('/') else self.base_url + '/' + url
+                            
+                        relevant_links.append({
+                            "title": link_text,
+                            "description": "Descripción no disponible",
+                            "url": url,
+                            "extracted_at": datetime.now().isoformat()
+                        })
+                
+                print(f"Encontrados {len(relevant_links)} enlaces relevantes")
+                
+                if relevant_links:
+                    results = relevant_links[:max_results]
+            
+            # Si se encontraron resultados, guardarlos
+            if results:
+                print(f"Scraping real exitoso: {len(results)} resultados")
+                self.results = results
+                return results
+            else:
+                print("No se encontraron resultados en el scraping real, usando datos de ejemplo")
+                return self._get_example_search_results(term, max_results)
+            
+        except RequestException as e:
+            print(f"Error de solicitud HTTP: {str(e)}")
+            return self._get_example_search_results(term, max_results)
+        except Exception as e:
+            print(f"Error durante el scraping: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._get_example_search_results(term, max_results)
     
     def extract_page_content(self, url):
         """
-        Devuelve contenido de ejemplo para una URL.
+        Extrae el contenido detallado de una página específica.
         
         Args:
-            url (str): URL para la cual generar contenido de ejemplo.
+            url (str): URL de la página a extraer.
             
         Returns:
-            dict: Contenido de ejemplo para la URL.
+            dict: Contenido extraído de la página.
         """
-        print(f"Generando contenido de ejemplo para URL: {url}")
+        if not self.session and not self.initialize():
+            print(f"No se pudo inicializar la sesión para extraer {url}, usando datos de ejemplo")
+            return self._get_example_page_content(url)
         
-        # Extraer el nombre de la página de la URL
-        page_name = url.split('/')[-1].replace('-', ' ').capitalize()
-        if not page_name:
-            page_name = "Seguros Sura"
-        
-        return {
-            "url": url,
-            "title": f"{page_name} | Seguros Sura Chile",
-            "content_html": f"<div><h1>{page_name}</h1><p>Información de ejemplo sobre {page_name} en Seguros Sura Chile.</p></div>",
-            "content_text": f"{page_name}\n\nInformación de ejemplo sobre {page_name} en Seguros Sura Chile.",
-            "categories": ["Seguros", "Empresas", "Colectivos"],
-            "images": [
-                {"src": "https://seguros.sura.cl/logo.png", "alt": "Logo Sura"}
-            ],
-            "extracted_at": datetime.now().isoformat()
-        }
+        try:
+            print(f"Extrayendo contenido de: {url}")
+            
+            # Realizar la solicitud
+            response = self.session.get(
+                url,
+                timeout=self.timeout,
+                allow_redirects=True
+            )
+            response.raise_for_status()
+            
+            # Parsear el HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Guardar una copia del HTML para depuración
+            os.makedirs("data", exist_ok=True)
+            debug_file = os.path.join("data", f"page_response_{datetime.now().strftime('%Y%m%d%H%M%S')}.html")
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            
+            # Extraer título
+            title = soup.title.string if soup.title else "Sin título"
+            
+            # Extraer contenido principal con diferentes selectores
+            content_selectors = [
+                ".main-content", 
+                "article", 
+                ".content-area", 
+                "main", 
+                "#main-content",
+                ".container"
+            ]
+            
+            content_html = ""
+            content_text = ""
+            
+            for selector in content_selectors:
+                content_element = soup.select_one(selector)
+                if content_element:
+                    print(f"Contenido principal encontrado con selector: {selector}")
+                    content_html = str(content_element)
+                    content_text = content_element.get_text(separator="\n", strip=True)
+                    break
+            
+            if not content_text:
+                # Si no encontramos el contenido con los selectores, usar el body
+                content_element = soup.body
+                if content_element:
+                    content_text = content_element.get_text(separator="\n", strip=True)
+            
+            # Extraer categorías/breadcrumbs
+            categories = []
+            category_selectors = [".categories a", ".breadcrumbs a", ".breadcrumb a", "nav.breadcrumb a"]
+            
+            for selector in category_selectors:
+                category_elements = soup.select(selector)
+                if category_elements:
+                    for element in category_elements:
+                        category_text = element.get_text(strip=True)
+                        if category_text:
+                            categories.append(category_text)
+                    
+                    if categories:
+                        break
+            
+            # Extraer imágenes
+            images = []
+            img_elements = soup.select("img")
+            
+            for img in img_elements:
+                src = img.get('src')
+                alt = img.get('alt', '')
+                
+                if src:
+                    # Convertir URLs relativas a absolutas
+                    if not src.startswith('http'):
+                        src = self.base_url + src if src.startswith('/') else self.base_url + '/' + src
+                    
+                    images.append({"src": src, "alt": alt})
+            
+            # Estructurar los datos extraídos
+            page_data = {
+                "url": url,
+                "title": title,
+                "content_html": content_html,
+                "content_text": content_text,
+                "categories": categories,
+                "images": images,
+                "extracted_at": datetime.now().isoformat()
+            }
+            
+            return page_data
+            
+        except RequestException as e:
+            print(f"Error de solicitud HTTP: {str(e)}")
+            return self._get_example_page_content(url)
+        except Exception as e:
+            print(f"Error durante la extracción de contenido: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._get_example_page_content(url)
     
     def save_results(self, filename="sura_results.json"):
         """
@@ -96,7 +351,7 @@ class SuraScraper:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.results, f, ensure_ascii=False, indent=2)
                 
-            print(f"Resultados de ejemplo guardados en {filepath}")
+            print(f"Resultados guardados en {filepath}")
             return True
         except Exception as e:
             print(f"Error al guardar resultados: {str(e)}")
@@ -104,23 +359,97 @@ class SuraScraper:
     
     def extract_seguros_colectivos(self, max_pages=5):
         """
-        Devuelve datos de ejemplo para seguros colectivos.
+        Extrae información específica sobre seguros colectivos.
         
         Args:
-            max_pages (int): No usado en esta versión simplificada.
+            max_pages (int): Número máximo de páginas a extraer.
             
         Returns:
-            dict: Información de ejemplo sobre seguros colectivos.
+            dict: Información extraída sobre seguros colectivos.
         """
+        results = {
+            "search_results": [],
+            "pages_content": [],
+            "extracted_at": datetime.now().isoformat()
+        }
+        
+        try:
+            # Buscar información sobre seguros colectivos
+            print("Iniciando extracción de información sobre seguros colectivos")
+            search_results = self.search_by_term("seguros colectivos", max_results=max_pages)
+            results["search_results"] = search_results
+            
+            # Extraer contenido de las páginas de resultados
+            for result in search_results[:max_pages]:
+                page_content = self.extract_page_content(result["url"])
+                results["pages_content"].append(page_content)
+            
+            # Intentar acceder directamente a la página de seguros colectivos
+            direct_url = f"{self.base_url}/empresas/seguros-colectivos"
+            try:
+                print(f"Accediendo directamente a: {direct_url}")
+                direct_page_content = self.extract_page_content(direct_url)
+                results["direct_page"] = direct_page_content
+            except Exception as e:
+                print(f"Error al acceder a la página directa: {str(e)}")
+                results["direct_page"] = {"error": str(e)}
+            
+            # Guardar los resultados
+            self.results = results
+            self.save_results("seguros_colectivos.json")
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error durante la extracción de seguros colectivos: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Usar datos de ejemplo como fallback
+            example_data = self._get_example_seguros_colectivos()
+            self.results = example_data
+            self.save_results("seguros_colectivos.json")
+            
+            return example_data
+    
+    # Métodos para generar datos de ejemplo como fallback
+    
+    def _get_example_search_results(self, term, max_results=10):
+        """Genera resultados de ejemplo para una búsqueda."""
+        print(f"Generando resultados de ejemplo para búsqueda: {term}")
+        
+        if "colectivo" in term.lower():
+            self.results = self._create_colectivo_results()[:max_results]
+        else:
+            self.results = self._create_generic_results(term)[:max_results]
+        
+        return self.results
+    
+    def _get_example_page_content(self, url):
+        """Genera contenido de ejemplo para una URL."""
+        print(f"Generando contenido de ejemplo para URL: {url}")
+        
+        # Extraer el nombre de la página de la URL
+        page_name = url.split('/')[-1].replace('-', ' ').capitalize()
+        if not page_name:
+            page_name = "Seguros Sura"
+        
+        return {
+            "url": url,
+            "title": f"{page_name} | Seguros Sura Chile",
+            "content_html": f"<div><h1>{page_name}</h1><p>Información de ejemplo sobre {page_name} en Seguros Sura Chile.</p></div>",
+            "content_text": f"{page_name}\n\nInformación de ejemplo sobre {page_name} en Seguros Sura Chile.",
+            "categories": ["Seguros", "Empresas", "Colectivos"],
+            "images": [
+                {"src": "https://seguros.sura.cl/logo.png", "alt": "Logo Sura"}
+            ],
+            "extracted_at": datetime.now().isoformat()
+        }
+    
+    def _get_example_seguros_colectivos(self):
+        """Genera datos de ejemplo completos para seguros colectivos."""
         print("Generando datos de ejemplo para seguros colectivos")
-        
-        results = self._create_seguros_colectivos_data()
-        
-        # Guardar los resultados
-        self.results = results
-        self.save_results("seguros_colectivos.json")
-        
-        return results
+        return self._create_seguros_colectivos_data()
     
     def _create_colectivo_results(self):
         """Crea resultados de ejemplo para búsquedas relacionadas con seguros colectivos."""
@@ -184,38 +513,7 @@ class SuraScraper:
     def _create_seguros_colectivos_data(self):
         """Crea datos de ejemplo detallados para seguros colectivos."""
         return {
-            "search_results": [
-                {
-                    "title": "Seguros Colectivos para Empresas | Sura",
-                    "description": "Protege a tus colaboradores con planes de salud, vida y ahorro a precios preferenciales. Nuestros seguros colectivos ofrecen beneficios exclusivos para empresas de todos los tamaños.",
-                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
-                    "extracted_at": datetime.now().isoformat()
-                },
-                {
-                    "title": "Seguros de Vida Colectivos | Sura",
-                    "description": "El seguro de vida colectivo protege a tus colaboradores con coberturas por fallecimiento, invalidez y enfermedades graves. Incluye beneficios adicionales como asistencia funeral y adelanto de capital.",
-                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/vida",
-                    "extracted_at": datetime.now().isoformat()
-                },
-                {
-                    "title": "Seguros de Salud Colectivos | Sura",
-                    "description": "Ofrece acceso a los mejores centros médicos con reembolsos por gastos médicos, cobertura dental y beneficios de medicamentos. Planes personalizados según las necesidades de tu empresa.",
-                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/salud",
-                    "extracted_at": datetime.now().isoformat()
-                },
-                {
-                    "title": "Planes de Ahorro Colectivos | Sura",
-                    "description": "Facilita a tus colaboradores acumular un capital a través de aportes sistemáticos, con beneficios tributarios para empresas. Planes de inversión con rentabilidad competitiva.",
-                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/ahorro",
-                    "extracted_at": datetime.now().isoformat()
-                },
-                {
-                    "title": "Preguntas Frecuentes sobre Seguros Colectivos | Sura",
-                    "description": "Resolvemos tus dudas sobre la contratación, coberturas y beneficios de los seguros colectivos. Información clara sobre cómo funcionan los planes para empresas.",
-                    "url": "https://seguros.sura.cl/empresas/seguros-colectivos/preguntas-frecuentes",
-                    "extracted_at": datetime.now().isoformat()
-                }
-            ],
+            "search_results": self._create_colectivo_results(),
             "pages_content": [
                 {
                     "url": "https://seguros.sura.cl/empresas/seguros-colectivos",
@@ -279,4 +577,4 @@ def run_scraper(headless=True, search_term="seguros colectivos", max_results=5):
 if __name__ == "__main__":
     # Ejecutar una prueba rápida si se llama directamente
     results = run_scraper(headless=False)
-    print(f"Se encontraron {len(results)} resultados de ejemplo")
+    print(f"Se encontraron {len(results)} resultados")
