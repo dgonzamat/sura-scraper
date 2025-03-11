@@ -26,18 +26,25 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Google Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+# Instalar una versión específica de Google Chrome (134.0.6052.0)
+RUN wget -q -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_134.0.6052.0-1_amd64.deb \
     && apt-get update \
-    && apt-get install -y google-chrome-stable \
+    && apt install -y /tmp/chrome.deb \
+    && rm /tmp/chrome.deb \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar ChromeDriver manualmente (versión 114.0.5735.90 que es compatible con muchas versiones de Chrome)
-RUN wget -q --no-verbose -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip" \
-    && unzip /tmp/chromedriver.zip -d /usr/local/bin \
-    && rm /tmp/chromedriver.zip \
-    && chmod +x /usr/local/bin/chromedriver
+# Comprobar la versión de Chrome instalada
+RUN google-chrome --version
+
+# Instalar ChromeDriver exactamente compatible con Chrome 134.0.6052.0
+RUN mkdir -p /tmp/chromedriver \
+    && cd /tmp/chromedriver \
+    && wget -q --no-verbose -O chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/134.0.6052.0/linux64/chromedriver-linux64.zip" \
+    && unzip chromedriver.zip \
+    && mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
+    && chmod +x /usr/local/bin/chromedriver \
+    && rm -rf /tmp/chromedriver \
+    && chromedriver --version
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -46,6 +53,7 @@ WORKDIR /app
 ENV DOCKER_ENV=true
 ENV PORT=8080
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
+ENV CHROME_VERSION=134.0.6052.0
 
 # Copiar requirements.txt primero para aprovechar la caché
 COPY requirements.txt .
@@ -58,6 +66,12 @@ COPY . .
 
 # Crear directorios de datos y logs
 RUN mkdir -p data logs && chmod -R 777 data logs
+
+# Verificación final de configuración
+RUN echo "Verificando configuración..." \
+    && echo "Chrome: $(google-chrome --version)" \
+    && echo "ChromeDriver: $(chromedriver --version)" \
+    && echo "Python: $(python --version)"
 
 # Exponer puerto
 EXPOSE 8080
