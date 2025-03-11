@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import glob
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,7 +11,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.os_manager import ChromeType
 
 class SuraScraper:
     """Clase para extraer datos del sitio web de Seguros Sura."""
@@ -51,13 +51,47 @@ class SuraScraper:
         options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         
         try:
-            print("Inicializando ChromeDriver mediante webdriver_manager...")
-            # Usar webdriver_manager para gestionar la versión compatible de chromedriver
-            # Con configuración para asegurar compatibilidad
-            driver_path = ChromeDriverManager().install()
-            print(f"ChromeDriver instalado en: {driver_path}")
+            print("Inicializando ChromeDriver...")
             
+            # Usar ChromeDriverManager para descargar el driver
+            driver_manager = ChromeDriverManager()
+            print(f"Usando ChromeDriverManager: {driver_manager}")
+            
+            # Instalar el driver - esto descarga el ChromeDriver
+            driver_path = driver_manager.install()
+            print(f"ChromeDriver descargado en: {driver_path}")
+            
+            # Si el driver_path tiene "chromedriver-linux64" en la ruta, es posible que sea la nueva estructura de directorios
+            # En ese caso, necesitamos encontrar el ejecutable real del ChromeDriver
+            if "chromedriver-linux64" in driver_path and not os.path.isfile(driver_path):
+                print(f"Detectada nueva estructura de directorios para ChromeDriver")
+                
+                # Determinar el directorio base del driver
+                driver_dir = os.path.dirname(driver_path)
+                print(f"Directorio base del driver: {driver_dir}")
+                
+                # Buscar el ejecutable real del ChromeDriver
+                executable_candidates = []
+                for root, dirs, files in os.walk(driver_dir):
+                    for file in files:
+                        if file == "chromedriver" or file == "chromedriver.exe":
+                            full_path = os.path.join(root, file)
+                            executable_candidates.append(full_path)
+                            print(f"Encontrado posible ejecutable en: {full_path}")
+                
+                if executable_candidates:
+                    driver_path = executable_candidates[0]
+                    print(f"Usando ejecutable: {driver_path}")
+                    
+                    # Asegurar que el archivo es ejecutable
+                    os.chmod(driver_path, 0o755)
+            
+            # Crear el servicio de ChromeDriver
+            print(f"Creando Service con driver_path: {driver_path}")
             service = Service(executable_path=driver_path)
+            
+            # Inicializar el driver
+            print("Inicializando Chrome WebDriver...")
             self.driver = webdriver.Chrome(service=service, options=options)
             
             self.driver.set_page_load_timeout(self.timeout)
@@ -69,8 +103,6 @@ class SuraScraper:
             import traceback
             traceback.print_exc()
             return False
-
-    # El resto del código permanece igual...
     
     def close(self):
         """Cierra el navegador y libera recursos."""
